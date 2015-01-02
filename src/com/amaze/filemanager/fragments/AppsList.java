@@ -25,28 +25,38 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.AsyncTask;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.preference.PreferenceManager;
 import android.support.v4.app.ListFragment;
 import android.view.ActionMode;
 import android.view.View;
+import android.view.animation.Animation;
+import android.view.animation.AnimationUtils;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
+import android.widget.TextView;
 import android.widget.Toast;
 
+import com.afollestad.materialdialogs.MaterialDialog;
 import com.amaze.filemanager.R;
+import com.amaze.filemanager.activities.MainActivity;
 import com.amaze.filemanager.adapters.AppsAdapter;
 import com.amaze.filemanager.services.CopyService;
 import com.amaze.filemanager.utils.AppsSorter;
 import com.amaze.filemanager.utils.Futils;
 import com.amaze.filemanager.utils.IconHolder;
+import com.amaze.filemanager.utils.Icons;
 import com.amaze.filemanager.utils.Layoutelements;
+import com.melnykov.fab.FloatingActionButton;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Collections;
 import java.util.List;
 
@@ -59,28 +69,42 @@ public class AppsList extends ListFragment {
     public boolean selection = false;
     public ActionMode mActionMode;
     public ArrayList<ApplicationInfo> c = new ArrayList<ApplicationInfo>();
-   ListView vl;public IconHolder ic;
+    ListView vl;
+    public IconHolder ic;
     ArrayList<Layoutelements> a = new ArrayList<Layoutelements>();
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        setHasOptionsMenu(false);
         ic=new IconHolder(getActivity(),true,true);
     }
     @Override
     public void onActivityCreated(Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
-        getActivity().findViewById(R.id.pink_icon).setVisibility(View.GONE);
-        getActivity().findViewById(R.id.bookadd).setVisibility(View.GONE);
-        getActivity().findViewById(R.id.action_overflow).setVisibility(View.GONE);
-        getActivity().findViewById(R.id.search).setVisibility(View.GONE);
-        getActivity().findViewById(R.id.paste).setVisibility(View.INVISIBLE);
-        getActivity().findViewById(R.id.buttonbarframe).setVisibility(View.GONE);
+
         vl=getListView();
 
+        //((TextView) getActivity().findViewById(R.id.title)).setText(utils.getString(getActivity(), R.string.apps));
+
+        FloatingActionButton floatingActionButton = (FloatingActionButton) getActivity().findViewById(R.id.fab);
+        floatingActionButton.hide(true);
+
+        //getActivity().findViewById(R.id.fab).setVisibility(View.INVISIBLE);
         Sp = PreferenceManager.getDefaultSharedPreferences(getActivity());
         uimode = Integer.parseInt(Sp.getString("uimode", "0"));
         ListView vl = getListView();
+        Calendar calendar = Calendar.getInstance();
+        int hour = calendar.get(Calendar.HOUR_OF_DAY);
+        int theme=Integer.parseInt(Sp.getString("theme","0"));
+        int theme1 = theme;
+        if (theme == 2) {
+            if(hour<=6 || hour>=18) {
+                theme1 = 1;
+            } else
+                theme1 = 0;
+        }
+        if(theme1==1)getActivity().getWindow().getDecorView().setBackgroundColor(Color.BLACK);
         if (uimode == 1) {
             float scale = getResources().getDisplayMetrics().density;
             int dpAsPixels = (int) (5 * scale + 0.5f);
@@ -100,57 +124,67 @@ public class AppsList extends ListFragment {
     }
 
     public void onLongItemClick(final int position) {
-        AlertDialog.Builder d = new AlertDialog.Builder(getActivity());
-        ArrayAdapter<String> adapter1 = new ArrayAdapter<String>(
-                getActivity(), android.R.layout.select_dialog_item);
-        adapter1.add(utils.getString(getActivity(), R.string.open));
-        adapter1.add(utils.getString(getActivity(), R.string.backup));
-        adapter1.add(utils.getString(getActivity(), R.string.uninstall));
-        adapter1.add(utils.getString(getActivity(), R.string.properties));
-        adapter1.add(utils.getString(getActivity(), R.string.play));
-        d.setAdapter(adapter1, new DialogInterface.OnClickListener() {
+        new MaterialDialog.Builder(getActivity())
+                .items(new String[]{utils.getString(getActivity(), R.string.open),utils.getString(getActivity(), R.string.backup), utils.getString(getActivity(), R.string.uninstall),
+                        utils.getString(getActivity(), R.string.properties),utils.getString(getActivity(), R.string.play)})
+                .itemsCallback(new MaterialDialog.ListCallback() {
 
-            public void onClick(DialogInterface p1, int p2) {
-                switch (p2) {
-                    case 0:
-                        Intent i = app.getActivity().getPackageManager().getLaunchIntentForPackage(c.get(position).packageName);
-                        if (i != null)
-                            app.startActivity(i);
-                        else
-                            Toast.makeText(app.getActivity(),utils.getString(getActivity(),R.string.not_allowed), Toast.LENGTH_LONG).show();
-                        break;
+                    @Override
+                    public void onSelection(MaterialDialog materialDialog, View view, int i, CharSequence s) {
+                        switch (i) {
+                            case 0:
+                                Intent i1 = app.getActivity().getPackageManager().getLaunchIntentForPackage(c.get(position).packageName);
+                                if (i1!= null)
+                                    app.startActivity(i1);
+                                else
+                                    Toast.makeText(app.getActivity(),utils.getString(getActivity(),R.string.not_allowed), Toast.LENGTH_LONG).show();
+                                break;
 
-                    case 1:
-                        Toast.makeText(getActivity(), utils.getString(getActivity(), R.string.copyingapk) + Environment.getExternalStorageDirectory().getPath() + "/app_backup", Toast.LENGTH_LONG).show();
-                        ApplicationInfo info = c.get(position);
-                        File f = new File(info.publicSourceDir);
-                        ArrayList<String> a = new ArrayList<String>();
-                        a.add(info.publicSourceDir);
-                        File dst = new File(Environment.getExternalStorageDirectory().getPath() + "/app_backup");
-                        if(!dst.exists() || !dst.isDirectory())dst.mkdirs();
-                        Intent intent = new Intent(getActivity(), CopyService.class);
-                        intent.putExtra("FILE_PATHS", a);
-                        intent.putExtra("COPY_DIRECTORY", dst.getPath());
-                        getActivity().startService(intent);
-                        break;
-                    case 2:
-                        unin(c.get(position).packageName);
-                        break;
-                    case 3:
-                        startActivity(new Intent(
-                                android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                                Uri.parse("package:" + c.get(position).packageName)));
-                        break;
-                    case 4:
-                        Intent intent1 = new Intent(Intent.ACTION_VIEW);
-                        intent1.setData(Uri.parse("market://details?id=" + c.get(position).packageName));
-                        startActivity(intent1);
-                        break;
-                }
-                // TODO: Implement this method
-            }
-        });
-        d.show();
+                            case 1:
+                                Toast.makeText(getActivity(), utils.getString(getActivity(), R.string.copyingapk) + Environment.getExternalStorageDirectory().getPath() + "/app_backup", Toast.LENGTH_LONG).show();
+                                ApplicationInfo info = c.get(position);
+                                File f = new File(info.publicSourceDir);
+                                ArrayList<String> a = new ArrayList<String>();
+                                //a.add(info.publicSourceDir);
+                                File dst = new File(Environment.getExternalStorageDirectory().getPath() + "/app_backup");
+                                if(!dst.exists() || !dst.isDirectory())dst.mkdirs();
+                                Intent intent = new Intent(getActivity(), CopyService.class);
+                                //Toast.makeText(getActivity(), f.getParent(), Toast.LENGTH_LONG).show();
+
+                                if (Build.VERSION.SDK_INT == 21) {
+                                    a.add(f.getParent());
+                                } else {
+                                    a.add(f.getPath());
+                                }
+                                intent.putExtra("FILE_PATHS", a);
+                                intent.putExtra("COPY_DIRECTORY", dst.getPath());
+                                getActivity().startService(intent);
+                                break;
+                            case 2:
+                                if (!unin(c.get(position).packageName)) {
+                                    ArrayList<Layoutelements> arrayList = new ArrayList<Layoutelements>();
+                                    ApplicationInfo info1 = c.get(position);
+                                    ArrayList<Integer> arrayList1 = new ArrayList<Integer>();
+                                    arrayList1.add(position);
+                                    File f1 = new File(info1.publicSourceDir);
+                                    arrayList.add(utils.newElement(Icons.loadMimeIcon(getActivity(), f1.getPath(), false), f1.getPath(), null, null, utils.getSize(f1),"", false));
+                                    utils.deleteFiles(arrayList, null, arrayList1);
+                                } 
+                                break;
+                            case 3:
+                                startActivity(new Intent(
+                                        android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                        Uri.parse("package:" + c.get(position).packageName)));
+                                break;
+                            case 4:
+                                Intent intent1 = new Intent(Intent.ACTION_VIEW);
+                                intent1.setData(Uri.parse("market://details?id=" + c.get(position).packageName));
+                                startActivity(intent1);
+                                break;
+                        }
+                    }
+                }).title(a.get(position).getTitle()).build()
+                .show();
     }
 
     @Override
@@ -182,7 +216,7 @@ public class AppsList extends ListFragment {
                 }
                 Collections.sort(c, new AppsSorter(p));
                 for (ApplicationInfo object:c)
-                a.add(new Layoutelements(getActivity().getResources().getDrawable(R.drawable.ic_doc_apk_grid), object.loadLabel(getActivity().getPackageManager()).toString(), object.publicSourceDir,"","","",false));
+                a.add(new Layoutelements(getActivity().getResources().getDrawable(R.drawable.ic_doc_apk_grid), object.loadLabel(getActivity().getPackageManager()).toString(), object.publicSourceDir,"","","","",false));
 
             } catch (Exception e) {
                 //Toast.makeText(getActivity(), "" + e, Toast.LENGTH_LONG).show();
@@ -224,7 +258,7 @@ public class AppsList extends ListFragment {
         }
     }  // copy the .apk file to wherever
 
-    public void unin(String pkg) {
+    public boolean unin(String pkg) {
 
         try {
             Intent intent = new Intent(Intent.ACTION_DELETE);
@@ -233,7 +267,8 @@ public class AppsList extends ListFragment {
         } catch (Exception e) {
             Toast.makeText(getActivity(), "" + e, Toast.LENGTH_SHORT).show();
             e.printStackTrace();
+            return false;
         }
-
+        return true;
     }
 }

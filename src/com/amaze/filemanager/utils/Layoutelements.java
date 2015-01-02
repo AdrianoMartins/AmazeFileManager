@@ -29,29 +29,25 @@ import java.io.File;
 
 public class Layoutelements implements Parcelable {
     public Layoutelements(Parcel im) {
-        Bitmap bitmap = (Bitmap) im.readParcelable(getClass().getClassLoader());
-        // Convert Bitmap to Drawable:
-        imageId = new BitmapDrawable(bitmap);
+        try {
+            Bitmap bitmap = (Bitmap) im.readParcelable(getClass().getClassLoader());
+            // Convert Bitmap to Drawable:
+            imageId = new BitmapDrawable(bitmap);
+
         title = im.readString();
         desc = im.readString();
         permissions=im.readString();
         symlink=im.readString();
+        directorybool=im.readString();
         int i=im.readInt();
         if(i==0){header=false;}
         else{header=true;}
         date=im.readLong();
-    }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }}
 
-    public static final Parcelable.Creator<Layoutelements> CREATOR =
-            new Parcelable.Creator<Layoutelements>() {
-                public Layoutelements createFromParcel(Parcel in) {
-                    return new Layoutelements(in);
-                }
 
-                public Layoutelements[] newArray(int size) {
-                    return new Layoutelements[size];
-                }
-            };
 
     public int describeContents() {
         // TODO: Implement this method
@@ -63,6 +59,7 @@ public class Layoutelements implements Parcelable {
         p1.writeString(desc);
         p1.writeString(permissions);
         p1.writeString(symlink);
+        p1.writeString(directorybool);
         p1.writeLong(date);
         p1.writeInt(header ? 1 : 0);
         p1.writeParcelable(((BitmapDrawable) imageId).getBitmap(), p2);
@@ -75,9 +72,10 @@ public class Layoutelements implements Parcelable {
     private String permissions;
     private String symlink;
     private String size;
+    private String directorybool;
     private long date;
     boolean header;
-    public Layoutelements(Drawable imageId, String title, String desc,String permissions,String symlink,String size,boolean header) {
+    public Layoutelements(Drawable imageId, String title, String desc,String permissions,String symlink,String size,String direcorybool,boolean header) {
         this.imageId = imageId;
         this.title = title;
         this.desc = desc;
@@ -85,10 +83,21 @@ public class Layoutelements implements Parcelable {
         this.symlink=symlink.trim();
         this.size=size;
         this.header=header;
+        this.directorybool=direcorybool;
         if(!header)
         date=new File(desc).lastModified();
 
     }
+    public static final Parcelable.Creator<Layoutelements> CREATOR =
+            new Parcelable.Creator<Layoutelements>() {
+                public Layoutelements createFromParcel(Parcel in) {
+                    return new Layoutelements(in);
+                }
+
+                public Layoutelements[] newArray(int size) {
+                    return new Layoutelements[size];
+                }
+            };
 
     public Drawable getImageId() {
         return imageId;
@@ -103,8 +112,15 @@ public class Layoutelements implements Parcelable {
     public String getTitle() {
         return title.toString();
     }
-
-
+public String getDirectorybool(){return directorybool;}
+public boolean isDirectory(boolean rootmode){
+    if(rootmode)
+    if(hasSymlink()){boolean b=new File(desc).isDirectory();
+     return b;}else
+        return directorybool.equals("-1");
+        else
+    return new File(getDesc()).isDirectory();
+    }
     public String getSize() {
         return  size;
     }

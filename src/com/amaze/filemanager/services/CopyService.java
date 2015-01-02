@@ -20,6 +20,7 @@
 package com.amaze.filemanager.services;
 
 import android.app.Notification;
+import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.BroadcastReceiver;
@@ -31,11 +32,14 @@ import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.preference.PreferenceManager;
+import android.support.v4.app.NotificationCompat;
+import android.support.v4.content.LocalBroadcastManager;
 
 import com.amaze.filemanager.R;
 import com.amaze.filemanager.activities.MainActivity;
 import com.amaze.filemanager.utils.Futils;
 import com.amaze.filemanager.utils.MediaFile;
+import com.amaze.filemanager.utils.RootHelper;
 import com.stericson.RootTools.RootTools;
 import com.stericson.RootTools.exceptions.RootDeniedException;
 import com.stericson.RootTools.execution.Command;
@@ -54,6 +58,8 @@ public class CopyService extends Service {
     HashMap<Integer, Boolean> hash = new HashMap<Integer, Boolean>();
     Notification notification;
     boolean rootmode;
+    NotificationManager mNotifyManager;
+    NotificationCompat.Builder mBuilder;
     @Override
     public void onCreate() {
         notification = new Notification(R.drawable.ic_content_copy_white_36dp, getResources().getString(R.string.copying_fles), System.currentTimeMillis());
@@ -72,7 +78,8 @@ public class CopyService extends Service {
         Bundle b = new Bundle();
         ArrayList<String> files = intent.getStringArrayListExtra("FILE_PATHS");
         String FILE2 = intent.getStringExtra("COPY_DIRECTORY");
-
+        mNotifyManager =
+                (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         b.putInt("id", startId);
         b.putBoolean("move",intent.getBooleanExtra("move",false));
         b.putString("FILE2", FILE2);
@@ -122,18 +129,45 @@ public class CopyService extends Service {
     }
 
     private void publishResults(String a, int p1, int p2, int id, long total, long done, boolean b,boolean move) {
-        Intent intent = new Intent("copy");
-        intent.putExtra("name", a);
-        intent.putExtra("total", total);
-        intent.putExtra("done", done);
-        intent.putExtra("id", id);
-        intent.putExtra("p1", p1);
-        intent.putExtra("p2", p2);
-        intent.putExtra("move", move);
-        intent.putExtra("COPY_COMPLETED", b);
-        sendBroadcast(intent);
-
+        if(hash.get(id)) {
+            mBuilder.setProgress(100, p1, false);
+            mBuilder.setOngoing(true);
+            int title=R.string.copying;
+            if(move)title=R.string.moving;
+            mBuilder.setContentTitle(utils.getString(c,title));
+            mBuilder.setContentText(new File(a).getName()+" "+utils.readableFileSize(done)+"/"+utils.readableFileSize(total));
+            int id1=Integer.parseInt("456"+id);
+            mNotifyManager.notify(id1,mBuilder.build());
+            if(p1==100 || total==0){
+                mBuilder.setContentTitle("Copy completed");
+                if(move)
+                mBuilder.setContentTitle("Move Completed");
+                mBuilder.setContentText("");
+                mBuilder.setProgress(0,0,false);
+                mBuilder.setOngoing(false);
+                mNotifyManager.notify(id1,mBuilder.build());
+            publishCompletedResult(a,id1);
+            }
+            Intent intent = new Intent("copy");
+            intent.putExtra("name", a);
+            intent.putExtra("total", total);
+            intent.putExtra("done", done);
+            intent.putExtra("id", id);
+            intent.putExtra("p1", p1);
+            intent.putExtra("p2", p2);
+            intent.putExtra("move", move);
+            intent.putExtra("COPY_COMPLETED", b);
+            sendBroadcast(intent);
+        }else publishCompletedResult(a,Integer.parseInt("456"+id));}
+    public void publishCompletedResult(String a,int id1){
+        try {
+            mNotifyManager.cancel(id1);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
+
+
 
     Context c = this;
 
@@ -151,58 +185,58 @@ public class CopyService extends Service {
         long totalBytes = 0L, copiedBytes = 0L;
 
         public void execute(int id, final ArrayList<String> files,final String FILE2,final boolean move) {
-            if(new File(FILE2).canWrite() && new File(files.get(0)).canRead()){for (int i = 0; i < files.size(); i++) {
+            mBuilder = new NotificationCompat.Builder(c);
+            mBuilder.setContentTitle(getResources().getString(R.string.copying))
 
-                File f1 = new File(files.get(i));
-                if (f1.isDirectory()) {
-                    totalBytes = totalBytes + new Futils().folderSize(f1,false);
-                } else {
-                    totalBytes = totalBytes + f1.length();
+                    .setSmallIcon(R.drawable.ic_content_copy_white_36dp);
+            if (new File(FILE2).canWrite() && new File(files.get(0)).canRead()) {
+                try{
+                    for (int i = 0; i < files.size(); i++) {
+                        File f1 = new File(files.get(i));
+                        if (f1.isDirectory()) {
+                            totalBytes = totalBytes + new Futils().folderSize(f1);
+                        } else {
+                            totalBytes = totalBytes + f1.length();
+                        }
+                    }}catch(Exception e){}
+                for (int i = 0; i < files.size(); i++) {
+                    File f1 = new File(files.get(i));
+                    try {
+
+                        copyFiles((f1), new File(FILE2, f1.getName()), id, move);
+                    } catch (IOException e) {
+                        System.out.println("amaze " + e);
+                        publishResults("" + e, 0, 0, id, 0, 0, false, move);
+                    }
+
+                }
+                if (move) {
+                    boolean b = hash.get(id);
+                    if (b) new DeleteTask(getContentResolver(),  c).execute(utils.toFileArray(files));
+                }
+                Intent intent = new Intent("loadlist");
+                sendBroadcast(intent);
+            } else if (rootmode) {
+                RootTools.remount(FILE2, "rw");
+                for (int i = 0; i < files.size(); i++) {
+                    RootHelper.runAndWait("cp -R \""+getCommandLineString(files.get(i)) +"\" \""+getCommandLineString(FILE2) + "\"",true);
+                    utils.scanFile(FILE2+"/"+new File(files.get(i)).getName(), c);
+                }
+                if(move){new DeleteTask(getContentResolver(),c).execute(utils.toFileArray(files));}
+
+                Intent intent = new Intent("loadlist");
+                sendBroadcast(intent);
+
+            }else {
+                    System.out.println("Not Allowed");
                 }
             }
-            for (int i = 0; i < files.size(); i++) {
-                File f1 = new File(files.get(i));
-                try {
+        private static final String UNIX_ESCAPE_EXPRESSION = "(\\(|\\)|\\[|\\]|\\s|\'|\"|`|\\{|\\}|&|\\\\|\\?)";
 
-                    copyFiles((f1), new File(FILE2, f1.getName()), id,move);
-                } catch (IOException e) {
-                    System.out.println("amaze " + e);
-                    publishResults("" + e, 0, 0, id, 0, 0, false,move);
-                }
+        private  String getCommandLineString(String input) {
+            return input.replaceAll(UNIX_ESCAPE_EXPRESSION, "\\\\$1");
+        }
 
-            }if(move){new DeleteTask(getContentResolver(),null,c).execute(utils.toFileArray(files));}
-            }else if(rootmode){
-                RootTools.remount(FILE2,"rw");
-                for (int i = 0; i < files.size(); i++) {
-                Command a=new Command(0,"cp "+files.get(i) +" "+FILE2) {
-                    @Override
-                    public void commandOutput(int i, String s) {
-
-                    }
-
-                    @Override
-                    public void commandTerminated(int i, String s) {
-
-                    }
-
-                    @Override
-                    public void commandCompleted(int i, int i2) {
-                        if(move){new DeleteTask(getContentResolver(),null,c).execute(utils.toFileArray(files));}
-                        utils.scanFile(FILE2+"/"+new File(files.get(i)).getName(), c);
-                    }
-                };
-                try {
-                    RootTools.getShell(true).add(a);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                } catch (TimeoutException e) {
-                    e.printStackTrace();
-                } catch (RootDeniedException e) {
-                    e.printStackTrace();
-                }}
-            }else{System.out.println("Not Allowed");}
-            Intent intent = new Intent("loadlist");
-            sendBroadcast(intent);}
         private void copyFiles(File sourceFile, File targetFile, int id,boolean move) throws IOException {
             if (sourceFile.isDirectory()) {
                 if (!targetFile.exists()) targetFile.mkdirs();
@@ -222,9 +256,9 @@ public class CopyService extends Service {
                 OutputStream out;
                 try {
                 out= new FileOutputStream(targetFile);
-}catch (Exception e){out=new MediaFile(getContentResolver(),targetFile).write();}
+}catch (Exception e){out=new MediaFile(c,targetFile).write(size);}
 
-                byte[] buffer = new byte[8192];
+                byte[] buffer = new byte[20480];
 
                 int length;
                 //copy the file content in bytes

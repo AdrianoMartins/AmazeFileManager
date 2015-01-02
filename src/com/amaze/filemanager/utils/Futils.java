@@ -19,54 +19,60 @@
 
 package com.amaze.filemanager.utils;
 
-import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.ActivityNotFoundException;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.res.Resources;
 import android.graphics.BitmapFactory;
+import android.graphics.Color;
 import android.graphics.drawable.Drawable;
 import android.media.MediaScannerConnection;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.preference.PreferenceManager;
+import android.support.v4.app.Fragment;
+import android.support.v4.app.FragmentTransaction;
+import android.view.LayoutInflater;
 import android.view.View;
-import android.widget.ArrayAdapter;
 import android.widget.CheckBox;
 import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.afollestad.materialdialogs.DialogAction;
+import com.afollestad.materialdialogs.MaterialDialog;
+import com.afollestad.materialdialogs.Theme;
 import com.amaze.filemanager.R;
 import com.amaze.filemanager.activities.MainActivity;
 import com.amaze.filemanager.activities.TextReader;
-import com.amaze.filemanager.adapters.DialogAdapter;
 import com.amaze.filemanager.adapters.HiddenAdapter;
 import com.amaze.filemanager.fragments.Main;
+import com.amaze.filemanager.fragments.ZipViewer;
 import com.amaze.filemanager.services.DeleteTask;
 import com.amaze.filemanager.services.ExtractService;
 import com.amaze.filemanager.services.ZipTask;
 import com.stericson.RootTools.RootTools;
 import com.stericson.RootTools.execution.Command;
 
-import org.xml.sax.SAXException;
-
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
-import java.lang.reflect.Array;
+import java.io.InputStream;
+import java.security.MessageDigest;
 import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
 
-import javax.xml.parsers.ParserConfigurationException;
-
-import me.drakeet.materialdialog.MaterialDialog;
-
 public class Futils {
+
     public Futils() {
     }
 
@@ -121,17 +127,53 @@ public class Futils {
         intent.setAction(android.content.Intent.ACTION_VIEW);
 
         String type = MimeTypes.getMimeType(f);
-        intent.setDataAndType(Uri.fromFile(f), type);
-        c.startActivity(intent);
+        if(type!=null && type.trim().length()!=0 && !type.equals("*/*"))
+        {intent.setDataAndType(Uri.fromFile(f), type);
+        try {
+            c.startActivity(intent);
+        } catch (ActivityNotFoundException e) {
+            e.printStackTrace();
+        Toast.makeText(c,R.string.noappfound,Toast.LENGTH_SHORT).show();
+        openWith(f,c);
+        }}else{openWith(f, c);}
 
     }
 
-    public void openWith(File f, Context c) {
-        Intent intent = new Intent();
-        intent.setAction(android.content.Intent.ACTION_VIEW);
-        intent.setDataAndType(Uri.fromFile(f), "*/*");
-        c.startActivity(intent);
-
+    public void openWith(final File f,final Context c) {
+        MaterialDialog.Builder a=new MaterialDialog.Builder(c);
+        a.title("Open As");
+        String[] items=new String[]{"Text","Image","Video","Audio","Other"};
+        a.items(items).itemsCallback(new MaterialDialog.ListCallback() {
+            @Override
+            public void onSelection(MaterialDialog materialDialog, View view, int i, CharSequence charSequence) {
+                Intent intent = new Intent();
+                intent.setAction(android.content.Intent.ACTION_VIEW);
+                switch (i) {
+                    case 0:
+                        intent.setDataAndType(Uri.fromFile(f), "text/*");
+                        break;
+                    case 1:
+                        intent.setDataAndType(Uri.fromFile(f), "image/*");
+                        break;
+                    case 2:
+                        intent.setDataAndType(Uri.fromFile(f), "video/*");
+                        break;
+                    case 3:
+                        intent.setDataAndType(Uri.fromFile(f), "audio/*");
+                        break;
+                    case 4:
+                        intent.setDataAndType(Uri.fromFile(f), "*/*");
+                        break;
+                }
+                try {
+                    c.startActivity(intent);
+                } catch (Exception e) {
+                    Toast.makeText(c,R.string.noappfound,Toast.LENGTH_SHORT).show();
+                    openWith(f,c);
+                }
+            }
+        });
+        a.build().show();
     }public String getSize(File f) {
         long i =f.length();
 
@@ -139,52 +181,64 @@ public class Futils {
 
     }
 
-    public String getSize(String[] array) {
-        String sym=array[1];
-        long i;
-        if(sym!=null && sym.length()!=0){i=new File(array[1]).length();}
-        else
-            i = new File(array[0]).length();
+    public String getSize(String[] array,boolean showsize) {
+        if(showsize) {
+            String sym = array[1];
+            long i;
+            if (sym != null && sym.length() != 0) {
+                i = new File(array[1]).length();
+            } else
+                i = new File(array[0]).length();
 
-        return readableFileSize(i);
-
+            return readableFileSize(i);
+        }else return "";
     }
 
     public void deleteFiles(ArrayList<Layoutelements> a, final Main b, List<Integer> pos) {
-        final AlertDialog.Builder c = new AlertDialog.Builder(b.getActivity());
-        View v = b.getActivity().getLayoutInflater().inflate(R.layout.dialoginfo, null);
-        TextView tb = (TextView) v.findViewById(R.id.info);
-        c.setTitle(getString(b.getActivity(), R.string.confirm));
+        final MaterialDialog.Builder c = new MaterialDialog.Builder(b.getActivity());
+        c.title(getString(b.getActivity(), R.string.confirm));
         final ContentResolver contentResolver=b.getActivity().getContentResolver();
         String names = "";
         final ArrayList<File> todelete = new ArrayList<File>();
         for (int i = 0; i < pos.size(); i++) {
             String path = a.get(pos.get(i)).getDesc();
             todelete.add(new File(path));
-            names = names + "\n" + "(" + (i + 1) + ".)" + new File(path).getName();
+            names = names + "\n" + (i + 1) + ". " + new File(path).getName();
         }
-        tb.setText(getString(b.getActivity(), R.string.questiondelete) + names);
-        c.setView(v);
-        c.setNegativeButton(getString(b.getActivity(), R.string.no), null);
-        c.setPositiveButton(getString(b.getActivity(), R.string.yes), new DialogInterface.OnClickListener() {
+        c.content(getString(b.getActivity(), R.string.questiondelete) + names);
 
-            public void onClick(DialogInterface p1, int p2) {
+        c.positiveColor(Color.parseColor(b.skin));
+        c.negativeColor(Color.parseColor(b.skin));
+        if(b.theme1==1)
+            c.theme(Theme.DARK);
+        c.negativeText(getString(b.getActivity(), R.string.no));
+        c.positiveText(getString(b.getActivity(), R.string.yes));
+
+        c.callback(new MaterialDialog.Callback() {
+            @Override
+            public void onPositive(MaterialDialog materialDialog) {
                 Toast.makeText(b.getActivity(), getString(b.getActivity(), R.string.deleting), Toast.LENGTH_LONG).show();
-                new DeleteTask(b.getActivity().getContentResolver(),b,b.getActivity()).execute(todelete);
+                new DeleteTask(b.getActivity().getContentResolver(), b.getActivity()).execute(todelete);
+            }
+
+            @Override
+            public void onNegative(MaterialDialog materialDialog) {
+
+                //materialDialog.cancel();
             }
         });
-        c.show();
+        c.build().show();
     }
 
-    public String count(File f,Resources root) {
-        try {
+    public String count(File f,Resources root,boolean showSize) {
+        if(showSize)try {
             Integer i=RootHelper.getCount(f);
             if(i!=null){return i+" "+root.getString(R.string.items);}
             else{return "";}
 
         } catch (Exception e) {
             return "";
-        }
+        }else{return "";}
     }
     public boolean canGoBack(File f) {
         try {
@@ -268,37 +322,165 @@ public class Futils {
 
         return inSampleSize;
     }
+    public static byte[] createChecksum(String filename) throws Exception {
+        InputStream fis =  new FileInputStream(filename);
 
-    public void showProps(File f, Activity c,boolean root) {
+        byte[] buffer = new byte[1024];
+        MessageDigest complete = MessageDigest.getInstance("MD5");
+        int numRead;
+
+        do {
+            numRead = fis.read(buffer);
+            if (numRead > 0) {
+                complete.update(buffer, 0, numRead);
+            }
+        } while (numRead != -1);
+
+        fis.close();
+        return complete.digest();
+    }
+
+    // see this How-to for a faster way to convert
+    // a byte array to a HEX string
+    public static String getMD5Checksum(String filename) throws Exception {
+        byte[] b = createChecksum(filename);
+        String result = "";
+
+        for (int i=0; i < b.length; i++) {
+            result += Integer.toString( ( b[i] & 0xff ) + 0x100, 16).substring( 1 );
+        }
+        return result;
+    }
+    public void showProps(final File f, final Main c,boolean root) {
+        String date = getString(c.getActivity(), R.string.date) + getdate(f);
+        String items = "", size = "", name, parent;
+        name = getString(c.getActivity(), R.string.name) + f.getName();
+        parent = getString(c.getActivity(), R.string.location) + f.getParent();
+        if (f.isDirectory()) {
+            size = getString(c.getActivity(), R.string.size) + readableFileSize(folderSize(f));
+            items = getString(c.getActivity(), R.string.totalitems) + count(f,c.getResources(),true);
+        } else if (f.isFile()) {
+            items = "";
+            size = getString(c.getActivity(), R.string.size) + getSize(f);
+        }
+        SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(c.getActivity());
+        String skin = sp.getString("skin_color", "#5677fc");
+        MaterialDialog.Builder a = new MaterialDialog.Builder(c.getActivity());
+        a.title(getString(c.getActivity(), R.string.properties));
+        String md5="";
+        try {
+            md5="md5:"+getMD5Checksum(f.getPath());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        if(c.theme1==1)
+            a.theme(Theme.DARK);
+        a.content(name + "\n" + parent + "\n" + size + "\n" + items + "\n"
+                + date+"\n"+md5);
+        a.positiveText(R.string.copy_path);
+        a.negativeText(getString(c.getActivity(), R.string.copy) + " md5");
+        a.neutralText(R.string.cancel);
+        a.positiveColor(Color.parseColor(skin)).negativeColor(Color.parseColor(skin)).neutralColor(Color.parseColor(skin));
+        a.callback(new MaterialDialog.Callback() {
+            @Override
+            public void onPositive(MaterialDialog materialDialog) {
+
+                c.copyToClipboard(c.getActivity(), f.getPath());
+                Toast.makeText(c.getActivity(), c.getResources().getString(R.string.pathcopied), Toast.LENGTH_SHORT).show();
+            }
+
+            @Override
+            public void onNegative(MaterialDialog materialDialog) {
+                try {
+                    c.copyToClipboard(c.getActivity(), getMD5Checksum(f.getPath()));
+                    Toast.makeText(c.getActivity(), c.getResources().getString(R.string.pathcopied), Toast.LENGTH_SHORT).show();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+        MaterialDialog b= a.build();
+        if(f.isDirectory())b.getActionButton(DialogAction.NEGATIVE).setEnabled(false);
+        b.show();
+    }
+
+    public void showProps(final File f, final Context c,int theme1) {
         String date = getString(c, R.string.date) + getdate(f);
         String items = "", size = "", name, parent;
         name = getString(c, R.string.name) + f.getName();
         parent = getString(c, R.string.location) + f.getParent();
         if (f.isDirectory()) {
-            size = getString(c, R.string.size) + readableFileSize(folderSize(f,root));
-            items = getString(c, R.string.totalitems) + count(f,c.getResources());
+            size = getString(c, R.string.size) + readableFileSize(folderSize(f));
+            items = getString(c, R.string.totalitems) + count(f,c.getResources(),true);
         } else if (f.isFile()) {
             items = "";
             size = getString(c, R.string.size) + getSize(f);
         }
-        AlertDialog.Builder a = new AlertDialog.Builder(c);
-        View v = c.getLayoutInflater().inflate(R.layout.dialoginfo, null);
-        TextView tb = (TextView) v.findViewById(R.id.info);
-        a.setTitle(getString(c, R.string.properties));
-        tb.setText(name + "\n" + parent + "\n" + size + "\n" + items + "\n"
-                + date);
-        a.setView(v);
-        a.show();
+        SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(c);
+        String skin = sp.getString("skin_color", "#5677fc");
+        MaterialDialog.Builder a = new MaterialDialog.Builder(c);
+        a.title(getString(c, R.string.properties));
+        String md5="";
+        try {
+            md5="md5:"+getMD5Checksum(f.getPath());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        if(theme1==1)
+            a.theme(Theme.DARK);
+        a.content(name + "\n" + parent + "\n" + size + "\n" + items + "\n"
+                + date+"\n"+md5);
+        a.positiveText(R.string.copy_path);
+        a.negativeText(getString(c, R.string.copy) + " md5");
+        a.neutralText(R.string.cancel);
+        a.positiveColor(Color.parseColor(skin)).negativeColor(Color.parseColor(skin)).neutralColor(Color.parseColor(skin));
+        a.callback(new MaterialDialog.Callback() {
+            @Override
+            public void onPositive(MaterialDialog materialDialog) {
+
+                copyToClipboard(c, f.getPath());
+                Toast.makeText(c, c.getResources().getString(R.string.pathcopied), Toast.LENGTH_SHORT).show();
+            }
+
+            @Override
+            public void onNegative(MaterialDialog materialDialog) {
+                try {
+                    copyToClipboard(c, getMD5Checksum(f.getPath()));
+                    Toast.makeText(c, c.getResources().getString(R.string.pathcopied), Toast.LENGTH_SHORT).show();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+       MaterialDialog b= a.build();
+        if(f.isDirectory())b.getActionButton(DialogAction.NEGATIVE).setEnabled(false);
+               b.show();
+    }
+    public boolean copyToClipboard(Context context, String text) {
+        try {
+            android.content.ClipboardManager clipboard = (android.content.ClipboardManager) context
+                    .getSystemService(context.CLIPBOARD_SERVICE);
+            android.content.ClipData clip = android.content.ClipData
+                    .newPlainText("Path copied to clipboard", text);
+            clipboard.setPrimaryClip(clip);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
-    public static long folderSize(File directory,boolean rootMode) {
+    public static long folderSize(File directory) {
         long length = 0;
-        for (File file:directory.listFiles()) {
+        try {
+            for (File file:directory.listFiles()) {
 
-            if (file.isFile())
-                length += file.length();
-            else
-                length += folderSize(file,rootMode);
+                if (file.isFile())
+                    length += file.length();
+                else
+                    length += folderSize(file);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
         return length;
     }
@@ -322,46 +504,17 @@ public class Futils {
         b.putStringArrayList("paths", paths);
         return b;
     }
+    public boolean deletedirectory(File f){
+        boolean b=true;
+        for(File file:f.listFiles()){
+            boolean c;
+            if(file.isDirectory()){c=deletedirectory(file);}
+            else {c=file.delete();}
+            if(!c)b=false;
 
-    public static void delete(File file) throws IOException {
-
-        if (file.isDirectory()) {
-
-            // directory is empty, then delete it
-            if (file.list().length == 0) {
-
-                file.delete();
-                System.out.println("Directory is deleted : "
-                        + file.getAbsolutePath());
-
-            } else {
-
-                // list all the directory contents
-                String files[] = file.list();
-
-                for (String temp : files) {
-                    // construct the file structure
-                    File fileDelete = new File(file, temp);
-
-                    // recursive delete
-                    delete(fileDelete);
-                }
-
-                // check the directory again, if empty then delete it
-                if (file.list().length == 0) {
-                    file.delete();
-                    System.out.println("Directory is deleted : "
-                            + file.getAbsolutePath());
-                }
-            }
-
-        } else {
-            // if file, then delete it
-            file.delete();
-            System.out.println("File is deleted : " + file.getAbsolutePath());
-        }
+        }if(b)b=f.delete();
+        return b;
     }
-
     public boolean deletefiles(File f) {
 
         // make sure directory exists
@@ -373,10 +526,12 @@ public class Futils {
         } else {
 
             try {
+                if(f.isDirectory())
+                    return deletedirectory(f);
+                    else
+                return f.delete();
 
-                delete(f);
-                return true;
-            } catch (IOException e) {
+            } catch (Exception e) {
                 e.printStackTrace();
                 return false;
             }
@@ -427,7 +582,10 @@ public class Futils {
             Intent i = new Intent(m, TextReader.class);
             i.putExtra("path", f.getPath());
             m.startActivity(i);
-        } else {
+        } else if (f.getName().toLowerCase().endsWith(".zip") || f.getName().toLowerCase().endsWith(".jar")) {
+            showArchiveDialog(f, m);
+
+        }else if(f.getName().toLowerCase().endsWith(".apk")){showPackageDialog(f,m);}else {
             try {
                 openunknown(f, m);
             } catch (Exception e) {
@@ -436,9 +594,52 @@ public class Futils {
             }
         }
     }
+public void showPackageDialog(final File f,final MainActivity m){
+    MaterialDialog.Builder mat=new MaterialDialog.Builder(m);
+    mat.title(R.string.packageinstaller).content(R.string.pitext).positiveText(R.string.install).negativeText(R.string.view).neutralText(R.string.cancel).callback(new MaterialDialog.Callback() {
+        @Override
+        public void onPositive(MaterialDialog materialDialog) {
+            openunknown(f,m);
+        }
 
-    public Layoutelements newElement(Drawable i, String d,String permissions,String symlink,String size,boolean b) {
-        Layoutelements item = new Layoutelements(i, new File(d).getName(), d,permissions,symlink,size,b);
+        @Override
+        public void onNegative(MaterialDialog materialDialog) {
+            m.addZipViewTab(f.getPath());
+        }
+    });
+    mat.positiveColor(Color.parseColor(m.skin));
+    mat.neutralColor(Color.parseColor(m.skin));
+    mat.negativeColor(Color.parseColor(m.skin));
+    if(m.theme1==1)mat.theme(Theme.DARK);
+    mat.build().show();
+
+}
+    public void showArchiveDialog(final File f,final MainActivity m){
+        MaterialDialog.Builder mat=new MaterialDialog.Builder(m);
+        mat.title(R.string.archive).content(R.string.archtext).positiveText(R.string.extract).negativeText(R.string.view).neutralText(R.string.cancel).callback(new MaterialDialog.Callback() {
+            @Override
+            public void onPositive(MaterialDialog materialDialog) {
+                Intent intent = new Intent(m, ExtractService.class);
+                intent.putExtra("zip",f.getPath());
+                m.startService(intent);
+
+
+            }
+
+            @Override
+            public void onNegative(MaterialDialog materialDialog) {
+                m.addZipViewTab(f.getPath());
+            }
+        });
+        mat.positiveColor(Color.parseColor(m.skin));
+        mat.neutralColor(Color.parseColor(m.skin));
+        mat.negativeColor(Color.parseColor(m.skin));
+        if(m.theme1==1)mat.theme(Theme.DARK);
+        mat.build().show();
+
+    }
+    public Layoutelements newElement(Drawable i, String d,String permissions,String symlink,String size,String directorybool,boolean b) {
+        Layoutelements item = new Layoutelements(i, new File(d).getName(), d,permissions,symlink,size,directorybool,b);
         return item;
     }
 
@@ -459,198 +660,101 @@ public class Futils {
     }
 
     public void showNameDialog(final MainActivity m, final ArrayList<String> b, final String current) {
-        AlertDialog.Builder a = new AlertDialog.Builder(m);
+        MaterialDialog.Builder a = new MaterialDialog.Builder(m);
         View v = m.getLayoutInflater().inflate(R.layout.dialog, null);
         final EditText e = (EditText) v.findViewById(R.id.newname);
         e.setText("Newzip.zip");
-        a.setView(v);
-        a.setTitle(getString(m, R.string.enterzipname));
+        a.customView(v);
+        if(m.theme1==1)
+            a.theme(Theme.DARK);
+        a.title(getString(m, R.string.enterzipname));
         e.setHint(getString(m, R.string.enterzipname));
-        a.setPositiveButton(getString(m, R.string.create), new DialogInterface.OnClickListener() {
-
-            public void onClick(DialogInterface p1, int p2) {
+        a.positiveText(R.string.create);
+        a.callback(new MaterialDialog.Callback() {
+            @Override
+            public void onPositive(MaterialDialog materialDialog) {
                 Intent intent2 = new Intent(m, ZipTask.class);
                 String name = current + "/" + e.getText().toString();
                 intent2.putExtra("name", name);
                 intent2.putExtra("files", b);
                 m.startService(intent2);
-                // TODO: Implement this method
+            }
+
+            @Override
+            public void onNegative(MaterialDialog materialDialog) {
+
             }
         });
-        a.setNegativeButton(getString(m, R.string.cancel), null);
-        a.show();
-    }
-
-    public void longClickSearchItem(final Main main, String files) {
-        final File f = new File(files);
-        AlertDialog.Builder ba = new AlertDialog.Builder(main.getActivity());
-        ArrayAdapter<String> adapter = new ArrayAdapter<String>(
-                main.getActivity(), android.R.layout.select_dialog_item);
-        Toast.makeText(main.getActivity(), files, Toast.LENGTH_SHORT).show();
-        ba.setTitle(f.getName());
-        adapter.add(getString(main.getActivity(), R.string.openparent));
-        adapter.add(getString(main.getActivity(), R.string.openwith));
-        adapter.add(getString(main.getActivity(), R.string.about));
-        adapter.add(getString(main.getActivity(), R.string.share));
-        adapter.add(getString(main.getActivity(), R.string.compress));
-        if (!f.isDirectory() && f.getName().endsWith(".zip"))
-            adapter.add(getString(main.getActivity(), R.string.extract));
-        ba.setAdapter(adapter, new DialogInterface.OnClickListener() {
-
-            public void onClick(DialogInterface p1, int p2) {
-                switch (p2) {
-                    case 0:
-                        main.loadlist(new File(main.slist.get(p2).getDesc()).getParentFile(), true);
-                        break;
-                    case 1:
-                        openunknown(f, main.getActivity());
-                        break;
-                    case 2:
-                        showProps(f, main.getActivity(),main.rootMode);
-                        break;
-                    case 3:
-                        Intent i = new Intent();
-                        i.setAction(Intent.ACTION_SEND);
-                        i.setType("*/*");
-                        i.putExtra(Intent.EXTRA_STREAM, Uri.fromFile(f));
-                        main.startActivity(i);
-                        break;
-                    case 4:
-                        ArrayList<String> copies1 = new ArrayList<String>();
-                        copies1.add(f.getPath());
-                        showNameDialog((MainActivity) main.getActivity(), copies1, main.current);
-
-                        break;
-                    case 5:
-                        Intent intent = new Intent(main.getActivity(), ExtractService.class);
-                        intent.putExtra("zip", f.getPath());
-                        main.getActivity().startService(intent);
-                        break;
-                }
-            }
-        });
-        ba.show();
+        a.negativeText(getString(m, R.string.cancel));
+        a.positiveColor(Color.parseColor(m.skin));
+        a.negativeColor(Color.parseColor(m.skin));
+        a.build().show();
     }
 
     public void showSortDialog(final Main m) {
         String[] sort = m.getResources().getStringArray(R.array.sortby);
         int current = Integer.parseInt(m.Sp.getString("sortby", "0"));
-        AlertDialog.Builder a = new AlertDialog.Builder(m.getActivity());
-
-        a.setSingleChoiceItems(new ArrayAdapter<String>(m.getActivity(), android.R.layout.select_dialog_singlechoice, sort), current, new DialogInterface.OnClickListener() {
-            public void onClick(DialogInterface dialog, int i) {
-
-                m.Sp.edit().putString("sortby", "" + i).commit();
-                m.getSortModes();
-                m.loadlist(new File(m.current), false);
-                dialog.cancel();
-            }
-        });
-        a.setTitle(getString(m.getActivity(), R.string.sortby));
-        a.setNegativeButton(getString(m.getActivity(), R.string.cancel), null);
-        a.show();
-    }
-
-    public void showDirectorySortDialog(final Main m) {
-        String[] sort = m.getResources().getStringArray(R.array.directorysortmode);
-        AlertDialog.Builder a = new AlertDialog.Builder(m.getActivity());
-        int current = Integer.parseInt(m.Sp.getString("dirontop", "0"));
-
-        a.setSingleChoiceItems(new ArrayAdapter<String>(m.getActivity(), android.R.layout.select_dialog_singlechoice, sort), current, new DialogInterface.OnClickListener() {
+        MaterialDialog.Builder a = new MaterialDialog.Builder(m.getActivity());
+        if(m.theme1==1)a.theme(Theme.DARK);
+        a.items(sort).itemsCallbackSingleChoice(current, new MaterialDialog.ListCallback() {
             @Override
-            public void onClick(DialogInterface dialogInterface, int i) {
-                m.Sp.edit().putString("dirontop", "" + i).commit();
+            public void onSelection(MaterialDialog dialog, View view, int which, CharSequence text) {
+
+                m.Sp.edit().putString("sortby", "" + which).commit();
                 m.getSortModes();
                 m.loadlist(new File(m.current), false);
+                dialog.dismiss();
             }
         });
-
-        a.setTitle(getString(m.getActivity(), R.string.directorysort));
-        a.setNegativeButton(getString(m.getActivity(), R.string.cancel), null);
-        a.show();
+        a.title(R.string.sortby);
+        a.build().show();
     }
 
     public void showHistoryDialog(final Main m) {
         final ArrayList<String> paths = m.history.readTable();
-
-        final MaterialDialog ba = new MaterialDialog(m.getActivity());
-        ba.setTitle(getString(m.getActivity(), R.string.history));
-        DialogAdapter adapter = new DialogAdapter(m,m.getActivity(), R.layout.bookmarkrow, toFileArray(paths),ba);
-        ListView listView = new ListView(m.getActivity());
-        float scale = m.getResources().getDisplayMetrics().density;
-        int dpAsPixels = (int) (8 * scale + 0.5f);
-        listView.setPadding(0, dpAsPixels, 0, dpAsPixels);
-        listView.setDividerHeight(0);
+        final MaterialDialog.Builder a = new MaterialDialog.Builder(m.getActivity());
+        a.positiveText(R.string.cancel);
+        a.positiveColor(Color.parseColor(m.skin));
+        a.title(R.string.history);
+        if(m.theme1==1)
+            a.theme(Theme.DARK);
+        LayoutInflater layoutInflater = (LayoutInflater) m.getActivity().getSystemService(Context.LAYOUT_INFLATER_SERVICE);
+        View view = layoutInflater.inflate(R.layout.list_dialog, null);
+        ListView listView = (ListView) view.findViewById(R.id.listView);
+        listView.setDivider(null);
+        a.customView(view);
+        a.autoDismiss(true);
+        MaterialDialog x=a.build();
+        HiddenAdapter adapter = new HiddenAdapter(m.getActivity(),m, R.layout.bookmarkrow, toFileArray(paths),m.hidden,x,true);
         listView.setAdapter(adapter);
-        ba.setContentView(listView);
-        ba.setCanceledOnTouchOutside(true);
-        ba.setNegativeButton(getString(m.getActivity(), R.string.cancel), new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                ba.dismiss();
-            }
-        });
-        ba.show();
+        x.show();
 
     }
+
     public void showHiddenDialog(final Main m) {
-
-            final ArrayList<String> paths = m.hidden.readTable();
-            final ArrayList<File> fu=toFileArray(paths);
-            final MaterialDialog a = new MaterialDialog(m.getActivity());
-            a.setTitle(getString(m.getActivity(), R.string.hiddenfiles));
-        HiddenAdapter adapter = new HiddenAdapter(
-                    m.getActivity(),m, android.R.layout.select_dialog_item, fu,m.hidden,a);
-        ListView listView = new ListView(m.getActivity());
-        float scale = m.getResources().getDisplayMetrics().density;
-        int dpAsPixels = (int) (8 * scale + 0.5f);
-        listView.setPadding(0, dpAsPixels, 0, dpAsPixels);
-        listView.setDividerHeight(0);
+          final ArrayList<String> paths = m.hidden.readTable();
+            final MaterialDialog.Builder a = new MaterialDialog.Builder(m.getActivity());
+        a.positiveText(R.string.cancel);
+        a.positiveColor(Color.parseColor(m.skin));
+        a.title(R.string.hiddenfiles);
+        if(m.theme1==1)
+            a.theme(Theme.DARK);
+        LayoutInflater layoutInflater = (LayoutInflater) m.getActivity().getSystemService(Context.LAYOUT_INFLATER_SERVICE);
+        View view = layoutInflater.inflate(R.layout.list_dialog, null);
+        ListView listView = (ListView) view.findViewById(R.id.listView);
+        a.customView(view);
+        a.autoDismiss(true);
+        listView.setDivider(null);
+        MaterialDialog x=a.build();
+        HiddenAdapter adapter = new HiddenAdapter(m.getActivity(),m, R.layout.bookmarkrow, toFileArray(paths),m.hidden,x,false);
         listView.setAdapter(adapter);
-            a.setContentView(listView);
-            a.setNegativeButton(getString(m.getActivity(), R.string.cancel), new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                  a.dismiss();
-                }
-            });
-        a.setCanceledOnTouchOutside(true);
-            a.show();
+        x.show();
 
-    }
-    public void showBookmarkDialog(final Main m, Shortcuts sh) {
-        try {
-            final ArrayList<File> fu = sh.readS();
-
-            final MaterialDialog ba = new MaterialDialog(m.getActivity());
-            ba.setTitle(getString(m.getActivity(), R.string.books));
-
-            DialogAdapter adapter = new DialogAdapter(m,
-                    m.getActivity(), android.R.layout.select_dialog_item, fu,ba);
-            ListView listView = new ListView(m.getActivity());
-            float scale = m.getResources().getDisplayMetrics().density;
-            int dpAsPixels = (int) (8 * scale + 0.5f);
-            listView.setPadding(0, dpAsPixels, 0, dpAsPixels);
-            listView.setDividerHeight(0);
-            listView.setAdapter(adapter);
-            ba.setContentView(listView);
-            ba.setCanceledOnTouchOutside(true);
-            ba.setNegativeButton(getString(m.getActivity(), R.string.cancel), new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    ba.dismiss();
-                }
-            });
-            ba.show();
-        } catch (IOException e) {
-        } catch (ParserConfigurationException e) {
-        } catch (SAXException e) {
-        }
     }
     public void setPermissionsDialog(final Layoutelements f, final Main main){
         if(main.rootMode){
             final File file=new File(f.getDesc());
-            final MaterialDialog a=new MaterialDialog(main.getActivity());
+            final MaterialDialog.Builder a=new MaterialDialog.Builder(main.getActivity());
             View v=main.getActivity().getLayoutInflater().inflate(R.layout.permissiontable,null);
             final CheckBox readown=(CheckBox) v.findViewById(R.id.creadown);
             final CheckBox readgroup=(CheckBox) v.findViewById(R.id.creadgroup);
@@ -679,10 +783,11 @@ public class Futils {
             exeown.setChecked(exe[0]);
             exegroup.setChecked(exe[1]);
             exeother.setChecked(exe[2]);
-
-            a.setPositiveButton(main.getResources().getString(R.string.set),new View.OnClickListener() {
+            a.positiveText(R.string.set);
+            a.positiveColor(Color.parseColor(main.skin));
+            a.callback(new MaterialDialog.Callback() {
                 @Override
-                public void onClick(View j) {
+                public void onPositive(MaterialDialog materialDialog) {
                     int a=0,b=0,c=0;
                     if(readown.isChecked())a=4;
                     if(writeown.isChecked())b=2;
@@ -727,12 +832,18 @@ public class Futils {
                         Toast.makeText(main.getActivity(),main.getResources().getString(R.string.error),Toast.LENGTH_LONG).show();
                         e1.printStackTrace();
                     }
+
+                }
+
+                @Override
+                public void onNegative(MaterialDialog materialDialog) {
+
                 }
             });
-            a.setTitle(file.getName());
-            a.setContentView(v);
-            a.setCanceledOnTouchOutside(true);
-            a.show();}else{Toast.makeText(main.getActivity(),main.getResources().getString(R.string.enablerootmde),Toast.LENGTH_LONG).show();}
+            a.title(file.getName());
+            a.customView(v);
+            if(main.theme1==1)a.theme(Theme.DARK);
+            a.build().show();}else{Toast.makeText(main.getActivity(),main.getResources().getString(R.string.enablerootmde),Toast.LENGTH_LONG).show();}
     }String per=null;
     public String getFilePermissionsSymlinks(String file,final Context c,boolean root)
     {per=null;
@@ -753,24 +864,29 @@ public class Futils {
             return per;}
     }
     public String[] parseName(String line){
-        boolean linked=false;String name="",link="";
+        boolean linked=false;String name="",link="",size="-1";
         String[] array=line.split(" ");
         for(int i=0;i<array.length;i++){
             if(array[i].contains("->")){linked=true;}
         }
         if(!linked){int p=getColonPosition(array);
+            size=array[p-2];
             for(int i=p+1;i<array.length;i++){name=name+" "+array[i];}
             name=name.trim();
-            return new String[]{name,"",array[0]};
+            if(size.equals(""))size="-1";
+            return new String[]{name,"",array[0],size};
         }
         else if(linked){int p=getColonPosition(array);
+            size=array[p-2];
             int q=getLinkPosition(array);
             for(int i=p+1;i<q;i++){name=name+" "+array[i];}
             name=name.trim();
             for(int i=q+1;i<array.length;i++){link=link+" "+array[i];}
-            return  new String[]{name,link,array[0]};
+            if(size.equals(""))size="-1";
+            return  new String[]{name,link,array[0],size};
         }
-        return new String[]{name,"",array[0]};
+        if(size.equals(""))size="-1";
+        return new String[]{name,"",array[0],size};
     }
     public int getLinkPosition(String[] array){
         for(int i=0;i<array.length;i++){

@@ -28,9 +28,12 @@ import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.support.v4.app.Fragment;
+import android.support.v4.content.LocalBroadcastManager;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.animation.Animation;
+import android.view.animation.AnimationUtils;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -39,8 +42,10 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.amaze.filemanager.R;
+import com.amaze.filemanager.activities.MainActivity;
 import com.amaze.filemanager.utils.Futils;
 import com.amaze.filemanager.utils.IconUtils;
+import com.melnykov.fab.FloatingActionButton;
 
 import java.util.ArrayList;
 
@@ -64,14 +69,11 @@ public class ProcessViewer extends Fragment {
                 container, false);
         setRetainInstance(false);
 
-        getActivity().findViewById(R.id.buttonbarframe).setVisibility(View.GONE);
-        getActivity().findViewById(R.id.pink_icon).setVisibility(View.GONE);
-        getActivity().findViewById(R.id.bookadd).setVisibility(View.GONE);
-        getActivity().findViewById(R.id.paste).setVisibility(View.GONE);
+        FloatingActionButton floatingActionButton = (FloatingActionButton) getActivity().findViewById(R.id.fab);
+        floatingActionButton.hide(true);
+
         rootView = (LinearLayout) root.findViewById(R.id.secondbut);
-        getActivity().getActionBar().setSubtitle(utils.getString(getActivity(),R.string.processes));
-        ((LinearLayout) getActivity().findViewById(R.id.buttons))
-                .setVisibility(View.GONE);
+        ((MainActivity)getActivity()).getSupportActionBar().setTitle(utils.getString(getActivity(),R.string.processes));
         Sp = PreferenceManager.getDefaultSharedPreferences(getActivity());
         icons = new IconUtils(Sp, getActivity());
         return root;
@@ -80,16 +82,17 @@ public class ProcessViewer extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
-        (getActivity()).registerReceiver(Copy_Receiver, new IntentFilter("copy"));
-        (getActivity()).registerReceiver(Extract_Receiver, new IntentFilter("EXTRACT_CONDITION"));
-        (getActivity()).registerReceiver(Zip_Receiver, new IntentFilter("ZIPPING"));
+       (getActivity()).registerReceiver(Copy_Receiver, new IntentFilter("copy"));
+       (getActivity()).registerReceiver(Extract_Receiver, new IntentFilter("EXTRACT_CONDITION"));
+       (getActivity()).registerReceiver(Zip_Receiver, new IntentFilter("ZIPPING"));
     }
 
     @Override
     public void onPause() {
         super.onPause();
-        (getActivity()).unregisterReceiver(Copy_Receiver);
-        (getActivity()).unregisterReceiver(Extract_Receiver);
+       (getActivity()).unregisterReceiver(Copy_Receiver);
+       (getActivity()).unregisterReceiver(Extract_Receiver);
+       (getActivity()).unregisterReceiver(Zip_Receiver);
         rootView.removeAllViewsInLayout();
         CopyIds.clear();
         CancelledCopyIds.clear();
@@ -125,7 +128,7 @@ public class ProcessViewer extends Fragment {
                             boolean move = b.getBoolean("move", false);
                             String text = utils.getString(getActivity(), R.string.copying) + "\n" + name + "\n" + utils.readableFileSize(done) + "/" + utils.readableFileSize(total) + "\n" + p1 + "%";
                             if (move) {
-                                text = utils.getString(getActivity(), R.string.copying) + "\n" + name + "\n" + utils.readableFileSize(done) + "/" + utils.readableFileSize(total) + "\n" + p1 + "%";
+                                text = utils.getString(getActivity(), R.string.moving) + "\n" + name + "\n" + utils.readableFileSize(done) + "/" + utils.readableFileSize(total) + "\n" + p1 + "%";
                             }
                             ((TextView) process.findViewById(R.id.progressText)).setText(text);
                             ProgressBar p = (ProgressBar) process.findViewById(R.id.progressBar1);
@@ -189,19 +192,22 @@ public class ProcessViewer extends Fragment {
                     if (ExtractIds.contains(id)) {
 
                         boolean completed = b.getBoolean("extract_completed", false);
+                        boolean indefinite=b.getBoolean("indefinite",false);
                         View process = rootView.findViewWithTag("extract" + id);
                         if (completed) {
                             rootView.removeViewInLayout(process);
                             ExtractIds.remove(ExtractIds.indexOf(id));
                         } else {
                             String name = b.getString("name");
-                            int p1 = b.getInt("p1");
-
+                            int p1 = b.getInt("p1",0);
+                            long p3=b.getLong("total");
+                            long p2=b.getLong("done");
                             ProgressBar p = (ProgressBar) process.findViewById(R.id.progressBar1);
                             if (p1 <= 100) {
-                                ((TextView) process.findViewById(R.id.progressText)).setText(utils.getString(getActivity(), R.string.extracting) + "\n" + name + "\n" + p1 + "%");
+                                ((TextView) process.findViewById(R.id.progressText)).setText(utils.getString(getActivity(), R.string.extracting) + "\n" + name + "\n" + p1 + "%"+"\n"+utils.readableFileSize(p2)+"/"+utils.readableFileSize(p3));
 
                                 p.setProgress(p1);
+                                if(indefinite && !p.isIndeterminate())p.setIndeterminate(true);
                             }
                         }
                     } else {
@@ -225,13 +231,12 @@ public class ProcessViewer extends Fragment {
                         });
 
                         String name = b.getString("name");
-                        int p1 = b.getInt("p1");
+                        int p1 = b.getInt("p1",0);
 
 
                         ((TextView) root.findViewById(R.id.progressText)).setText(utils.getString(getActivity(), R.string.extracting) + "\n" + name);
                         ProgressBar p = (ProgressBar) root.findViewById(R.id.progressBar1);
                         p.setProgress(p1);
-
                         ExtractIds.add(id);
                         rootView.addView(root);
                     }

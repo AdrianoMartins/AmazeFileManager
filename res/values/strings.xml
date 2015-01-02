@@ -1,3 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+
 <!--
     Copyright (C) 2014 Arpit Khurana <arpitkh96@gmail.com>, Vishal Nehra <vishalmeham2@gmail.com>
 
@@ -17,8 +19,10 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
     -->
 
-<resources>
-    <string name="app_name">Navigation Drawer Example</string>
+<resources
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:ignore="MissingTranslation">
+    <string name="app_name">Amaze File Manager</string>
     <string name="drawer_open">Open navigation drawer</string>
     <string name="drawer_close">Close navigation drawer</string>
     <string name="books">Bookmarks</string>
@@ -59,11 +63,11 @@
     <string name="searchpath">Search Path</string>
     <string name="search">SEARCH</string>
     <string name="enterfile">Enter File Name</string>
-    <string name="name">Name:</string>
-    <string name="date">Date:</string>
-    <string name="location">Located in:</string>
-    <string name="size">Size:</string>
-    <string name="totalitems">Total Items:</string>
+    <string name="name">Name: </string>
+    <string name="date">Date: </string>
+    <string name="location">Located in: </string>
+    <string name="size">Size: </string>
+    <string name="totalitems">Total Items: </string>
     <string name="enterzipname">Enter Zip Name</string>
     <string name="noappfound">No App found to open this file</string>
     <string name="copying">Copying</string>
@@ -104,7 +108,7 @@
     <string name="random">Random Skin</string>
     <string name="random_summary">Sets random theme at startup</string>
     <string name="colorize">Colorize Icons</string>
-    <string name="colorize_summary">Sets some icons color different than theme</string>
+    <string name="colorize_summary">Sets static icon color</string>
     <string name="back">Back</string>
     <string name="home">Home</string>
     <string name="paste">Paste</string>
@@ -129,8 +133,21 @@
     <string name="usedefaultgallerypath">Use Default Image Gallery Path</string>
 
     <!-- Changelog -->
-    <string name="changelog_version_1">&lt;font color="#524ef8">&lt;b>v1.0&lt;/font>&lt;/b>&lt;i>&lt;font color="#5299f2">&lt;br>Nov 11, 2014&lt;/i>&lt;/font>&lt;br>&lt;br></string>
+    <string name="changelog_version_1">&lt;font color="#524ef8">&lt;b>v1.0&lt;/font>&lt;/b>&lt;i>&lt;font color="#5299f2">&lt;br>Nov 11, 2014&lt;/i>&lt;/font>&lt;br></string>
     <string name="changelog_change_1">- Initial release&lt;br>&lt;br></string>
+    <string name="changelog_version_2">&lt;font color="#524ef8">&lt;b>v1.1&lt;/font>&lt;/b>&lt;i>&lt;font color="#5299f2">&lt;br>Dec 04, 2014&lt;/i>&lt;/font>&lt;br></string>
+    <string name="changelog_change_2">- Fixed cut/paste&lt;br>
+                                      - Fixed text editor for root&lt;br>
+                                      - Added German, French, Italian, Russian and Chinese languages&lt;br>
+                                      - Added bookmarks to navigation drawer&lt;br>
+                                      - Added material dialogs&lt;br>
+                                      - more...&lt;br>&lt;br></string>
+    <string name="changelog_version_3">&lt;font color="#524ef8">&lt;b>v1.3&lt;/font>&lt;/b>&lt;i>&lt;font color="#5299f2">&lt;br>Dec 13, 2014&lt;/i>&lt;/font>&lt;br></string>
+    <string name="changelog_change_3">- Added Spanish&lt;br>
+                                      - Various Zip Viewer fixes&lt;br>
+                                      - Can view apk and jar files&lt;br>
+                                      - Various text editor fixes&lt;br>
+                                      - more...&lt;br>&lt;br></string>
 
     <!-- New -->
     <!-- Array -->
@@ -160,6 +177,7 @@
     <string name="brown">Brown</string>
     <string name="black">Black</string>
     <string name="blue_grey">Blue Grey</string>
+    <string name="supersu">SuperSU</string>
     <!--DirectorySortMode-->
     <string name="foldersOnTop">Folders On Top</string>
     <string name="filesOnTop">Files On Top</string>
@@ -209,7 +227,7 @@
     <string name="permission">Permissions</string>
     <string name="hide">Hide</string>
     <string name="exit">Exit</string>
-    <string name="enternewname">Enter new nameA</string>
+    <string name="enternewname">Enter new name</string>
     <string name="doforall">Do for all items</string>
     <string name="gridcolumnno">Number of columns in grid view</string>
     <string name="randomDialog">Random</string>
@@ -237,5 +255,48 @@
     <string name="license">Open Source Licenses</string>
     <string name="feedback">Send Feedback</string>
     <string name="hiddenfiles">Hidden Files</string>
+    <string name="type">Type</string>
+    <string name="typeDesc">Type (Desc)</string>
+    <string name="rootdirectory">Root</string>
+    <string name="new_string">New</string>
+    <string name="setringtone">Set as ringtone</string>
+    <string name="copy_path">Copy Path</string>
+    <string name="addshortcut">Add Shortcut</string>
+    <string name="unsavedchanges">Unsaved Changes</string>
+    <string name="unsavedchangesdesc">You have unsaved changes,do you want to save them before exiting?</string>
+    <string name="saving">Saving</string>
+    <string name="packageinstaller">Package Installer</string>
+    <string name="view">View</string>
+    <string name="install">Install</string>
+    <string name="archive">Archive</string>
+    <string name="archtext">This is an archive. What action would you like to perform?</string>
+    <string name="pitext">This is a package installer. What action would you like to perform?</string>
+    <string name="xda_title">XDA</string>
+    <string name="xda_summary">Q&amp;A, Help &amp; Troubleshooting</string>
+    <string name="invalid_dir">Invalid Directory</string>
+    <string name="circularimages">Use circular icons for images and videos</string>
+    <string name="circularicons">Use circular icons</string>
+    <string name="back_title">Back navigation</string>
+    <string name="back_summary">Enables custom back navigation at top of the list</string>
+    <string name="details">Details</string>
+    <string name="translators">Translators</string>
+    <string name="german_translation_title">German</string>
+    <string name="italian_translation_title">Italian</string>
+    <string name="french_translation_title">French</string>
+    <string name="russian_translation_title">Russian</string>
+    <string name="spanish_translation_title">Spanish</string>
+    <string name="basque_translation_title">Basque</string>
+    <string name="chinese_translation_title">Chinese</string>
+    <string name="serbian_translation_title">Serbian</string>
+    <string name="turkish_translation_title">Turkish</string>
+    <string name="german_translation_summary">Patrick Mertens</string>
+    <string name="italian_translation_summary">Francesco Credidio</string>
+    <string name="french_translation_summary">Nicolas PIMENTEL, Primokorn, Renaud</string>
+    <string name="russian_translation_summary">Pablo Luchiano, Kim BeeJay</string>
+    <string name="spanish_translation_summary">Jose Miguel Sarasola</string>
+    <string name="basque_translation_summary">Aitor Beriain</string>
+    <string name="chinese_translation_summary">amtlib-dot-dll, Felix2yu</string>
+    <string name="serbian_translation_summary">Mladen Pejaković</string>
+    <string name="turkish_translation_summary">Hakan Güven</string>
 </resources>
-	
+
